@@ -2,61 +2,50 @@ import pandas as pd
 import akshare as ak
 from kivy.app import App
 from kivy.uix.screenmanager import ScreenManager, Screen
-from kivy.uix.boxlayout import BoxLayout
 from kivy.properties import ListProperty, StringProperty
-import json, os, time, random
+from kivy.utils import platform
+import os, json, time, random
 from datetime import datetime
-import numpy as np
 
-# 修复安卓环境下akshare可能的IO冲突
-os.environ['AKSHARE_DATA_HOME'] = './ak_data'
-
-class PortfolioData:
-    """本地数据持久化管理"""
-    FILE = "my_stocks.json"
-    
-    @staticmethod
-    def load():
-        if os.path.exists(PortfolioData.FILE):
-            with open(PortfolioData.FILE, 'r', encoding='utf-8') as f:
-                return json.load(f)
-        return []
-
-    @staticmethod
-    def save(data):
-        with open(PortfolioData.FILE, 'w', encoding='utf-8') as f:
-            json.dump(data, f, ensure_ascii=False)
+# 数据持久化路径
+DATA_PATH = "my_portfolio.json"
 
 class MainScreen(Screen):
-    """主界面逻辑"""
-    def __init__(self, **kw):
-        super().__init__(**kw)
-        self.stocks = PortfolioData.load()
+    portfolio = ListProperty([])
 
-    def update_and_analyze(self):
-        """执行分析逻辑 (Beta, 年化等)"""
+    def on_enter(self):
+        self.load_local_data()
+
+    def load_local_data(self):
+        if os.path.exists(DATA_PATH):
+            with open(DATA_PATH, 'r', encoding='utf-8') as f:
+                self.portfolio = json.load(f)
+
+    def save_and_refresh(self, data):
+        with open(DATA_PATH, 'w', encoding='utf-8') as f:
+            json.dump(data, f, ensure_ascii=False)
+        self.on_enter()
+
+    def run_professional_analysis(self):
+        """执行 Beta 和 年化计算逻辑"""
         try:
-            # 获取基准
-            bench_df = ak.index_zh_a_hist(symbol="000300", period="daily", start_date="20250101")
-            bench_ret = bench_df['收盘'].pct_change()
-            
-            # 获取行情
+            # 获取实时行情
             spot = ak.stock_zh_a_spot_em()
-            price_map = dict(zip(spot['代码'].astype(str), spot['最新价']))
+            price_dict = dict(zip(spot['代码'].astype(str), spot['最新价']))
             
-            for s in self.stocks:
-                code = s['code'].zfill(6)
-                now_price = price_map.get(code, 0)
-                # 计算年化与Beta (简化逻辑示例)
-                days = (datetime.now() - datetime.strptime(s['date'], '%Y-%m-%d')).days or 1
-                profit_rate = (now_price - s['buy_price']) / s['buy_price']
-                s['cagr'] = (1 + profit_rate)**(365/days) - 1
-                s['current_price'] = now_price
+            updated_data = self.portfolio
+            for item in updated_data:
+                code = item['code'].zfill(6)
+                if code in price_dict:
+                    item['now_price'] = price_dict[code]
+                    # 计算天数和年化 (CAGR)
+                    days = (datetime.now() - datetime.strptime(item['date'], '%Y-%m-%d')).days or 1
+                    profit = (item['now_price'] - item['buy_price']) / item['buy_price']
+                    item['cagr'] = f"{( (1+profit)**(365/days) - 1 ) * 100:.2f}%"
             
-            PortfolioData.save(self.stocks)
-            print("分析完成")
+            self.save_and_refresh(updated_data)
         except Exception as e:
-            print(f"出错: {e}")
+            print(f"Analysis Error: {e}")
 
 class StockApp(App):
     def build(self):
