@@ -4,16 +4,17 @@ jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v2
-      # 使用专门的 Buildozer Action 进行云端打包
+      - uses: actions/checkout@v4 # 升级到 v4
+      
       - name: Build with Buildozer
         uses: ArtemSBulgakov/buildozer-action@v1
         with:
           command: buildozer android debug
           buildozer_version: stable
-      # 上传生成的 APK 作为结果附件
+          
       - name: Upload Artifact
-        uses: actions/upload-artifact@v2
+        # 修复核心报错：必须升级到 v4
+        uses: actions/upload-artifact@v4 
         with:
-          name: stock-analyzer-apk
+          name: stock-pro-app
           path: bin/*.apk
