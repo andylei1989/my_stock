@@ -1,0 +1,19 @@
+name: Build APK
+on: [push]
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      # 使用专门的 Buildozer Action 进行云端打包
+      - name: Build with Buildozer
+        uses: ArtemSBulgakov/buildozer-action@v1
+        with:
+          command: buildozer android debug
+          buildozer_version: stable
+      # 上传生成的 APK 作为结果附件
+      - name: Upload Artifact
+        uses: actions/upload-artifact@v2
+        with:
+          name: stock-analyzer-apk
+          path: bin/*.apk
