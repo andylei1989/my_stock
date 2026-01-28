@@ -4,17 +4,19 @@ jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4 # 升级到 v4
-      
+      - uses: actions/checkout@v4
+
       - name: Build with Buildozer
+        # 使用更稳定的 Action 方式，并修复权限冲突
         uses: ArtemSBulgakov/buildozer-action@v1
         with:
           command: buildozer android debug
           buildozer_version: stable
-          
+          # 核心修复：不传递自定义参数，让容器按默认权限运行
+
       - name: Upload Artifact
-        # 修复核心报错：必须升级到 v4
-        uses: actions/upload-artifact@v4 
+        # 修复 v2 弃用报错
+        uses: actions/upload-artifact@v4
         with:
-          name: stock-pro-app
+          name: stock-analyzer-debug
           path: bin/*.apk
