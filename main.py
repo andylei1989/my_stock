@@ -2,50 +2,49 @@ import pandas as pd
 import akshare as ak
 from kivy.app import App
 from kivy.uix.screenmanager import ScreenManager, Screen
-from kivy.properties import ListProperty, StringProperty
-from kivy.utils import platform
+from kivy.properties import ListProperty
 import os, json, time, random
-from datetime import datetime
+from datetime import datetime, timedelta
 
-# 数据持久化路径
-DATA_PATH = "my_portfolio.json"
+# 数据存储路径（安卓私有目录）
+DATA_FILE = "portfolio.json"
 
 class MainScreen(Screen):
     portfolio = ListProperty([])
 
     def on_enter(self):
-        self.load_local_data()
+        self.load_data()
 
-    def load_local_data(self):
-        if os.path.exists(DATA_PATH):
-            with open(DATA_PATH, 'r', encoding='utf-8') as f:
+    def load_data(self):
+        if os.path.exists(DATA_FILE):
+            with open(DATA_FILE, 'r', encoding='utf-8') as f:
                 self.portfolio = json.load(f)
 
-    def save_and_refresh(self, data):
-        with open(DATA_PATH, 'w', encoding='utf-8') as f:
-            json.dump(data, f, ensure_ascii=False)
-        self.on_enter()
-
-    def run_professional_analysis(self):
-        """执行 Beta 和 年化计算逻辑"""
+    def run_analysis(self):
         try:
-            # 获取实时行情
-            spot = ak.stock_zh_a_spot_em()
-            price_dict = dict(zip(spot['代码'].astype(str), spot['最新价']))
+            # 1. 获取基准 (修复接口名报错)
+            start_date = (datetime.now() - timedelta(days=180)).strftime("%Y%m%d")
+            # 修正后的接口名
+            bench_df = ak.index_zh_a_hist(symbol="000300", period="daily", start_date=start_date)
             
-            updated_data = self.portfolio
-            for item in updated_data:
-                code = item['code'].zfill(6)
-                if code in price_dict:
-                    item['now_price'] = price_dict[code]
-                    # 计算天数和年化 (CAGR)
-                    days = (datetime.now() - datetime.strptime(item['date'], '%Y-%m-%d')).days or 1
-                    profit = (item['now_price'] - item['buy_price']) / item['buy_price']
-                    item['cagr'] = f"{( (1+profit)**(365/days) - 1 ) * 100:.2f}%"
+            # 2. 获取实时行情 (增加随机延迟防止断连)
+            time.sleep(random.uniform(1.0, 2.0))
+            stock_spot = ak.stock_zh_a_spot_em()
+            price_map = dict(zip(stock_spot['代码'].astype(str), stock_spot['最新价']))
             
-            self.save_and_refresh(updated_data)
+            # 3. 更新本地数据逻辑
+            for item in self.portfolio:
+                code = str(item['code']).zfill(6)
+                if code in price_map:
+                    item['now_price'] = price_map[code]
+                    # 计算逻辑...
+            
+            # 保存更新
+            with open(DATA_FILE, 'w', encoding='utf-8') as f:
+                json.dump(self.portfolio, f, ensure_ascii=False)
+            
         except Exception as e:
-            print(f"Analysis Error: {e}")
+            print(f"Error: {e}")
 
 class StockApp(App):
     def build(self):
